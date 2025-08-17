@@ -1,0 +1,10 @@
+services:
+  frontend:
+    build:
+      context: /path/to/your/next-js/app
+      dockerfile: /path/to/your/Dockerfile
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production

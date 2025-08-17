@@ -1,0 +1,19 @@
+services:
+  backend:
+    container_name: write_container_name_for_backend
+    build:
+      context: .
+      dockerfile: path/to/your/Dockerfile
+    env_file:
+      - .env
+    command:
+      - /bin/bash
+      - -c
+      - |
+        python manage.py makemigrations
+        python manage.py migrate
+        gunicorn --bind 0.0.0.0:8000 config.wsgi:application
+#        config.wsgi:application  can be replaced with your Django app's WSGI application path
+    restart: always
+    ports:
+      - "8000:8000" # The port in the right is the port of the host machine which you can access the Django application
