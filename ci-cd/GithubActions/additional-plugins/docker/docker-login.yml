@@ -1,0 +1,6 @@
+- name: Login to the Container Registry
+  uses: docker/login-action@v3
+  with:
+    registry: ghcr.io # GitHub Container registry: Here's more: https://github.com/docker/login-action?tab=readme-ov-file#usage
+    username: ${{ github.actor }} # it's basically who pushed the code tl;dr username
+    password: ${{ secrets.GIT_TOKEN }} # your git token in repository secret

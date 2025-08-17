@@ -1,0 +1,16 @@
+name: Create .env file example
+
+on:
+  push:
+    branches:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Make .env file"
+        uses: SpicyPizza/create-envfile@v2.0
+        with:
+          envkey_MY_SECRET_KEY: ${{ secrets.MY_SECRET_KEY }}
+          envkey_MY_OTHER_SECRET: ${{ secrets.MY_OTHER_SECRET }}
+          file_name: .env
+          fail_on_empty: false

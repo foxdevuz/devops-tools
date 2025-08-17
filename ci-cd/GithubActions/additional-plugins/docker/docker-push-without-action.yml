@@ -1,0 +1,9 @@
+- name: Login to Yandex CR
+  run: |
+    echo ${{ secrets.YANDEX_TOKEN }} | docker login --username oauth --password-stdin cr.yandex
+#    Login to your container registry, example YANDEX
+
+- name: Build and push Docker image
+  run: |
+    docker buildx build --platform linux/amd64 -f ./path/to/Dockerfile --no-cache -t <your container registry> --push .
+#    Example for <your container registry>:  cr.yandex/your-container-app-id/image-name:tag

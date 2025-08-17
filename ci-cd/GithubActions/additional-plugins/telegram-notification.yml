@@ -1,0 +1,21 @@
+notify:
+  runs-on: ubuntu-latest
+  if: always()
+  needs: deploy
+  steps:
+    - name: Notify Deployment
+      uses: appleboy/telegram-action@master
+      with:
+        to: ${{ secrets.TELEGRAM_GROUP }}
+        token: ${{ secrets.BOT_TOKEN }}
+        format: html
+        message: |
+#          you can use own formatting in message
+          <b>Github Action Workflow:</b> ${{ github.workflow }} has been finished.
+          <b>Overall Status:</b> ${{ job.status }}
+          <b>Deploy server status:</b> ${{ needs.deploy.result }}
+          <b>Time:</b> ${{ github.event.head_commit.timestamp }}
+          <b>Authored by:</b> ${{ github.actor }}
+          <b>Repo:</b> ${{ github.event.repository.name }}
+          <b>Branch:</b> ${{ github.ref_name }}
+          <b>Commit Message:</b> ${{ github.event.head_commit.message }}
