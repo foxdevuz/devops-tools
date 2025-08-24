@@ -1,0 +1,72 @@
+- name: Install node exporter
+  hosts: node_exporter
+  become: yes
+  vars_files:
+    - variables.yml
+  tasks:
+    - name: Get node exporter
+      ansible.builtin.get_url:
+            url: "https://github.com/prometheus/node_exporter/releases/download/v1.9.1/node_exporter-1.9.1.linux-amd64.tar.gz"
+            dest: ~/
+
+    - name: Extract node exporter
+      ansible.builtin.unarchive:
+            src: ~/node_exporter-1.9.1.linux-amd64.tar.gz
+            dest: ~/
+            remote_src: yes
+            creates: ~/node_exporter-1.9.1.linux-amd64
+
+
+    - name: Copy node exporter to /usr/local/bin
+      ansible.builtin.copy:
+            src: ~/node_exporter-1.9.1.linux-amd64/node_exporter
+            dest: /usr/local/bin/node_exporter
+            remote_src: yes
+            mode: '0755'
+
+
+    - name: Create node exporter user
+      ansible.builtin.user:
+          name: node_exporter
+          shell: /sbin/nologin
+          system: yes
+          create_home: no
+
+    - name: Create node exporter service file
+      ansible.builtin.copy:
+          dest: /etc/systemd/system/node_exporter.service
+          content: |
+            [Unit]
+            Description=Node Exporter
+            Wants=network-online.target
+            After=network-online.target
+            
+            [Service]
+            User=node_exporter
+            Group=node_exporter
+            Type=simple
+            Restart=on-failure
+            RestartSec=5s
+            ExecStart=/usr/local/bin/node_exporter
+            
+            [Install]
+            WantedBy=multi-user.target
+          mode: '0644'
+    - name: Systemctl daemon-reload
+      ansible.builtin.systemd:
+          daemon_reload: yes
+
+    - name: Enable and start node exporter service
+      ansible.builtin.systemd:
+        name: node_exporter
+        enabled: yes
+        state: started
+
+    - name: Allow firewall for node exporter
+      ansible.builtin.ufw:
+          rule: allow
+          from_ip: "{{ allow_from_ip }}"
+          port: 9100
+          proto: tcp
+          state: enabled
+          comment: "Allow Node Exporter"
