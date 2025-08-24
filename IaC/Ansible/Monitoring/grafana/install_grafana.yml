@@ -1,0 +1,57 @@
+- name: Install grafana
+  hosts: grafana
+  become: yes
+  tasks:
+    - name: Install required dependencies
+      ansible.builtin.apt:
+        name: "{{ item }}"
+        state: present
+        update_cache: yes
+      loop:
+        - apt-transport-https
+        - software-properties-common
+        - wget
+
+    - name: Create folder for GPG key
+      ansible.builtin.file:
+        path: /etc/apt/keyrings/
+        state: directory
+
+    - name: Download Grafana GPG key
+      ansible.builtin.get_url:
+        url: https://apt.grafana.com/gpg.key
+        dest: /etc/apt/keyrings/grafana.gpg.asc
+        mode: '0644'
+        force: yes
+
+    - name: Convert Grafana key to dearmored format
+      ansible.builtin.command:
+        cmd: gpg --dearmor -o /etc/apt/keyrings/grafana.gpg /etc/apt/keyrings/grafana.gpg.asc --batch --yes
+        creates: /etc/apt/keyrings/grafana.gpg
+
+    - name: Add Grafana stable repository
+      ansible.builtin.apt_repository:
+        repo: "deb [signed-by=/etc/apt/keyrings/grafana.gpg] https://apt.grafana.com stable main"
+        filename: grafana.list
+
+    - name: Install Grafana
+      ansible.builtin.apt:
+        name: grafana
+        state: present
+
+    - name: Reload systemd to recognize grafana-server service
+      ansible.builtin.systemd:
+        daemon_reload: yes
+
+    - name: Enable and start Grafana service
+      ansible.builtin.systemd:
+        name: grafana-server
+        enabled: yes
+        state: started
+
+    - name: Allow Grafana port
+      community.general.ufw:
+        rule: allow
+        port: '3000'
+        proto: tcp
+        comment: "Allow Grafana access"
