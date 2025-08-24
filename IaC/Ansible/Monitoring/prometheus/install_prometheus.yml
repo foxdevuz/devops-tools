@@ -86,10 +86,10 @@
         enabled: yes
         state: started
 
-    - name: Allow firewall for node exporter
+    - name: Allow firewall for Prometheus
       ansible.builtin.ufw:
         rule: allow
         port: 9090
         proto: tcp
         state: enabled
-        comment: "Allow Node Exporter"
+        comment: "Allow Prometheus"
