@@ -1,0 +1,95 @@
+- name: Install and configure prometheus
+  hosts: prometheus
+  become: yes
+  vars_files:
+    - variables.yml
+  tasks:
+    - name: Get Prometheus
+      ansible.builtin.get_url:
+        url: "https://github.com/prometheus/prometheus/releases/download/v2.54.1/prometheus-2.54.1.linux-amd64.tar.gz"
+        dest: ~/
+
+    - name: Extract prometheus
+      ansible.builtin.unarchive:
+        src: ~/prometheus-2.54.1.linux-amd64.tar.gz
+        dest: ~/
+        remote_src: yes
+        creates: ~/prometheus-2.54.1.linux-amd64
+
+    - name: Create prometheus user
+      ansible.builtin.user:
+        name: prometheus
+        shell: /sbin/nologin
+        system: yes
+        create_home: no
+
+    - name: Create prometheus config folder
+      ansible.builtin.file:
+        path: "{{ item.dest }}"
+        state: directory
+        mode: '0755'
+        owner: prometheus
+      loop:
+        - { dest: "/etc/prometheus" }
+        - { dest: "/var/lib/prometheus" }
+
+    - name: Copy node exporter to /usr/local/bin
+      ansible.builtin.copy:
+        src: "{{ item.src }}"
+        dest: "{{ item.dest }}"
+        remote_src: yes
+        mode: '0755'
+        owner: prometheus
+      loop:
+        - { src: '~/prometheus-2.54.1.linux-amd64/prometheus', dest: "/usr/local/bin" }
+        - { src: '~/prometheus-2.54.1.linux-amd64/promtool', dest: "/usr/local/bin" }
+        - { src: '~/prometheus-2.54.1.linux-amd64/prometheus.yml', dest: "/etc/prometheus/prometheus.yml" }
+        - { src: '~/prometheus-2.54.1.linux-amd64/consoles/', dest: "/etc/prometheus/" }
+        - { src: '~/prometheus-2.54.1.linux-amd64/console_libraries/', dest: "/etc/prometheus/" }
+
+
+    - name: Create prometheus service file
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/prometheus.service
+        content: |
+          [Unit]
+          Description=Prometheus
+          Wants=network-online.target
+          After=network-online.target
+          
+          [Service]
+          User=prometheus
+          Group=prometheus
+          Type=simple
+          Restart=on-failure
+          RestartSec=5s
+          ExecStart=/usr/local/bin/prometheus \
+          --config.file /etc/prometheus/prometheus.yml \
+          --storage.tsdb.path /var/lib/prometheus/ \
+          --web.console.templates=/etc/prometheus/consoles \
+          --web.console.libraries=/etc/prometheus/console_libraries \
+          --web.listen-address=0.0.0.0:9090 \
+          --web.enable-lifecycle \
+          --log.level=info
+          
+          [Install]
+          WantedBy=multi-user.target
+        mode: '0644'
+
+    - name: Systemctl daemon-reload
+      ansible.builtin.systemd:
+        daemon_reload: yes
+
+    - name: Enable and start prometheus service
+      ansible.builtin.systemd:
+        name: prometheus
+        enabled: yes
+        state: started
+
+    - name: Allow firewall for node exporter
+      ansible.builtin.ufw:
+        rule: allow
+        port: 9090
+        proto: tcp
+        state: enabled
+        comment: "Allow Node Exporter"
