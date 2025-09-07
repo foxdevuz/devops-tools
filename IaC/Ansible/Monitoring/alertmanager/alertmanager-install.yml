@@ -1,0 +1,84 @@
+- name: Install Aler manager
+  hosts: alertmanager
+  become: yes
+  vars_files:
+    - variables.yml
+  tasks:
+  
+    - name: Get alertmanager
+      ansible.builtin.get_url:
+            url: "https://github.com/prometheus/alertmanager/releases/download/v0.28.1/alertmanager-0.28.1.linux-amd64.tar.gz"
+            dest: ~/
+  
+    - name: Create alertmanager user
+      ansible.builtin.user:
+          name: alertmanager
+          shell: /sbin/nologin
+          system: yes
+          create_home: no
+
+    - name: Extract alertmanager
+      ansible.builtin.unarchive:
+            src: ~/alertmanager-0.28.1.linux-amd64.tar.gz
+            dest: ~/
+            remote_src: yes
+            creates: ~/alertmanager-0.28.1.linux-amd64
+
+    - name: Create alertmanager config folder
+      ansible.builtin.file:
+          path: /etc/alertmanager
+          state: directory
+          mode: '0755'
+          owner: alertmanager
+          group: alertmanager
+
+    - name: Copy alertmanager to /usr/local/bin
+      ansible.builtin.copy:
+            src: "{{ item.src }}"
+            dest: "{{ item.dest }}"
+            remote_src: yes
+            mode: '0755'
+            owner: alertmanager
+      loop:
+        - { src: '~/alertmanager-0.28.1.linux-amd64/alertmanager', dest: '/usr/local/bin/alertmanager' }
+        - { src: '~/alertmanager-0.28.1.linux-amd64/amtool', dest: '/usr/local/bin/amtool' }
+        - { src: '~/alertmanager-0.28.1.linux-amd64/alertmanager.yml', dest: '/etc/alertmanager/alertmanager.yml' }
+
+    - name: Create alertmanager service file
+      ansible.builtin.copy:
+          dest: /etc/systemd/system/alertmanager.service
+          content: |
+            [Unit]
+            Description=Alertmanager
+            Wants=network-online.target
+            After=network-online.target
+
+            [Service]
+            User=alertmanager
+            Group=alertmanager
+            Type=simple
+            WorkingDirectory=/etc/alertmanager/
+            ExecStart=/usr/local/bin/alertmanager --config.file=/etc/alertmanager/alertmanager.yml --web.external-url http://0.0.0.0:9093
+
+            [Install]
+            WantedBy=multi-user.target
+
+          mode: '0644'
+    - name: Systemctl daemon-reload
+      ansible.builtin.systemd:
+          daemon_reload: yes
+
+    - name: Enable and start alertmanager service
+      ansible.builtin.systemd:
+        name: alertmanager
+        enabled: yes
+        state: started
+
+    - name: Allow firewall for alertmanager
+      ansible.builtin.ufw:
+          rule: allow
+          from_ip: "{{ allow_from_ip }}"
+          port: 9093
+          proto: tcp
+          state: enabled
+          comment: "Allow Alertmanager"
