@@ -1,35 +1,51 @@
 FROM python:3.12-slim
 
+# Environment setup
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV DISPLAY=:99
 
 WORKDIR /app
 
-# Install dependencies for Chrome
-RUN apt-get update && apt-get install -y wget unzip gnupg \
-    libx11-6 libx11-xcb1 libxcomposite1 libxcursor1 libxdamage1 \
-    libxext6 libxi6 libxtst6 libnss3 libglib2.0-0 libatk1.0-0 \
-    libatk-bridge2.0-0 libcups2 libdrm2 libdbus-1-3 libxrandr2 \
-    libgbm1 libasound2 fonts-liberation && \
-    rm -rf /var/lib/apt/lists/*
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    wget unzip gnupg \
+    libx11-6 libx11-xcb1 libxcb1 libxcb-dri3-0 \
+    libxcomposite1 libxcursor1 libxdamage1 libxext6 \
+    libxi6 libxtst6 libxrandr2 \
+    libgbm1 libdrm2 libnss3 \
+    libatk1.0-0 libatk-bridge2.0-0 libcups2 \
+    libglib2.0-0 libasound2 libcairo2 libxkbcommon0 \
+    libpango-1.0-0 libpangocairo-1.0-0 libpangoft2-1.0-0 \
+    fonts-liberation \
+ && rm -rf /var/lib/apt/lists/*
 
+
+# Define version
 ENV CHROME_VERSION=140.0.7339.127
 
+# Download Google Chrome
 RUN wget -q https://storage.googleapis.com/chrome-for-testing-public/${CHROME_VERSION}/linux64/chrome-linux64.zip -O /tmp/chrome.zip && \
     unzip /tmp/chrome.zip -d /opt/ && \
     rm /tmp/chrome.zip && \
     ln -s /opt/chrome-linux64/chrome /usr/bin/google-chrome
 
+# Download Chromedriver
 RUN wget -q https://storage.googleapis.com/chrome-for-testing-public/${CHROME_VERSION}/linux64/chromedriver-linux64.zip -O /tmp/chromedriver.zip && \
     unzip /tmp/chromedriver.zip -d /usr/local/bin/ && \
+    mv /usr/local/bin/chromedriver-linux64/chromedriver /usr/local/bin/chromedriver && \
+    chmod +x /usr/local/bin/chromedriver && \
     rm /tmp/chromedriver.zip
 
+# Install Python deps
 COPY requirements.txt /app/
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Copy project
 COPY . /app/
 
+# Expose Django port
 EXPOSE 8000
 
+# Default command (Django via Gunicorn)
 CMD ["gunicorn", "--bind", "0.0.0.0:8000", "app.wsgi:application", "--workers", "3", "--timeout", "120"]
