@@ -1,0 +1,31 @@
+# Alertmanager configuration file 
+# You need to replace TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID with your actual Telegram bot token and chat ID.
+# File should be placed/replaced at /etc/alertmanager/alertmanager.yml
+
+route:
+  group_by: ['alertname']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 1h
+  receiver: 'web.hook'
+  routes:
+    - match:
+        alertname: "InstanceDown"
+      receiver: "telegram-bot"
+      repeat_interval: 1m
+
+receivers:
+  - name: 'web.hook'
+    webhook_configs:
+      - url: 'http://127.0.0.1:5001/'
+
+  - name: 'telegram-bot'
+    telegram_configs:
+      - bot_token: 'TELEGRAM_BOT_TOKEN'
+        chat_id: 'TELEGRAM_CHAT_ID'
+        parse_mode: 'Markdown'
+        message: |
+          🚨 *{{ .CommonLabels.alertname }}*
+          ❌ Instance: `{{ .CommonLabels.instance }}`
+          🔎 Job: `{{ .CommonLabels.job }}`
+          📝 {{ .CommonAnnotations.summary }}
