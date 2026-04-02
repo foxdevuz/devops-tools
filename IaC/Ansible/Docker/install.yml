@@ -1,0 +1,67 @@
+---
+- name: Install and Configure Docker Engine (Ubuntu)
+  hosts: production
+  become: true
+  vars_files:
+    - vars/variables.yml
+
+  tasks:
+    - name: Install prerequisite packages (needed for curl, HTTPS, and GPG)
+      ansible.builtin.apt:
+        pkg:
+          - ca-certificates
+          - curl
+          - gnupg
+        state: present
+        update_cache: true
+
+    - name: Create the GPG keyring directory
+      ansible.builtin.file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: '0755'
+
+    - name: Download Docker GPG key
+      ansible.builtin.get_url:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        dest: /etc/apt/keyrings/docker.asc
+        mode: '0644'
+
+    - name: Get system architecture
+      ansible.builtin.command: dpkg --print-architecture
+      register: arch_output
+      changed_when: false
+
+    - name: Get Ubuntu codename
+      ansible.builtin.command: bash -c ". /etc/os-release && echo $VERSION_CODENAME"
+      register: codename_output
+      changed_when: false
+
+    - name: Set up the stable Docker APT repository
+      ansible.builtin.apt_repository:
+        repo: "deb [arch={{ arch_output.stdout }} signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu {{ codename_output.stdout }} stable"
+        state: present
+        filename: docker
+        update_cache: true
+
+    - name: Install Docker Engine, CLI, and Containerd
+      ansible.builtin.apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+        state: present
+
+    - name: Ensure Docker service is running and enabled on boot
+      ansible.builtin.systemd_service:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Add user '{{ user_to_add_to_docker_group }}' to the 'docker' group
+      ansible.builtin.user:
+        name: "{{ user_to_add_to_docker_group }}"
+        groups: docker
+        append: true

@@ -1,0 +1,12 @@
+---
+- name: Certbot installation setup
+  hosts: production
+  become: true
+  tasks:
+    - name: Install Certbot and the Nginx plugin
+      ansible.builtin.apt:
+        pkg:
+          - certbot
+          - python3-certbot-nginx
+        state: present
+        update_cache: true

@@ -1,0 +1,15 @@
+- name: Creating Docker Compose config for application
+  hosts: production
+  become: yes
+  vars_files:
+    - vars/vars.yml
+  tasks:
+    - name: Create Docker Compose Dir
+      ansible.builtin.file:
+        path: "{{ dir_path }}"
+        state: directory
+
+    - name: Create Docker Compose File
+      ansible.builtin.template:
+        src: templates/docker-compose.yml.j2
+        dest: "{{ file_path }}"

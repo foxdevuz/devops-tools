@@ -1,3 +1,6 @@
 .idea
 .vscode
 .ansible
+.fleet
+./testing-area
+./testing-area/*

@@ -1,0 +1,10 @@
+services:
+  backend:
+    image: {{ image }}
+    container_name: {{ container_name }}
+    restart: always
+    ports:
+      - "{{ ports }}"
+    volumes:
+      - ./media:/app/media
+      - ./staticfiles:/app/staticfiles

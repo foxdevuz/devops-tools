@@ -1,0 +1,33 @@
+- name: Creating Nginx config for application
+  hosts: production
+  become: yes
+  vars_files:
+    - vars/vars.yml
+  tasks:
+    - name: Create Nginx directory
+      ansible.builtin.file:
+        path: /etc/nginx/sites-available/
+        state: directory
+
+    - name: Link Nginx config
+      ansible.builtin.template:
+        src: templates/nginx.conf.j2
+        dest: "{{ domain_path }}"
+
+    - name: Enable site
+      ansible.builtin.file:
+        src: "{{ domain_path }}"
+        dest: "{{ enabling_path }}"
+        state: link
+      notify:
+        - Reload Nginx
+        - Get SSl
+
+  handlers:
+    - name: Reload Nginx
+      ansible.builtin.service:
+        name: nginx
+        state: reloaded
+
+    - name: Get SSl
+      ansible.builtin.command: certbot --nginx -d {{ domain }} --non-interactive --agree-tos --email {{ ssl_email }}

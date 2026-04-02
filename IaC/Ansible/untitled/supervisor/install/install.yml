@@ -1,0 +1,17 @@
+---
+- name: Install Supervisor
+  hosts: production
+  become: true
+
+  tasks:
+    - name: Install Supervisor package
+      ansible.builtin.apt:
+        name: supervisor
+        state: present
+        update_cache: true
+
+    - name: Ensure Supervisor is started and enabled
+      ansible.builtin.systemd_service:
+        name: supervisor
+        state: started
+        enabled: true

@@ -1,0 +1,82 @@
+- name: Install and Configure MYSQL Database (Ubuntu)
+  hosts: production
+  become: true
+  vars_files:
+    - ./vars/variable.yml
+
+  tasks:
+    - name: Install MYSQL server
+      ansible.builtin.apt:
+        update_cache: true
+        name:
+          - mysql-server
+          - python3-pymysql
+        state: present
+
+    - name: Ensure MySQL service is running and enabled on boot
+      ansible.builtin.systemd_service:
+        name: mysql.service
+        state: started
+        enabled: true
+
+    - name: Set root password (fresh install with auth_socket)
+      community.mysql.mysql_user:
+        name: root
+        password: "{{ mysql_root_password }}"
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+      register: root_password_fresh
+      ignore_errors: true
+
+    - name: Set root password (existing password matches)
+      community.mysql.mysql_user:
+        name: root
+        password: "{{ mysql_root_password }}"
+        login_user: root
+        login_password: "{{ mysql_root_password }}"
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+      when: root_password_fresh is failed
+      register: root_password_existing
+      ignore_errors: true
+
+    - name: Read Debian maintenance credentials
+      ansible.builtin.slurp:
+        src: /etc/mysql/debian.cnf
+      register: debian_cnf
+      when: root_password_fresh is failed and root_password_existing is failed
+
+    - name: Parse Debian maintenance user
+      ansible.builtin.set_fact:
+        debian_mysql_user: "{{ debian_cnf.content | b64decode | regex_search('user\\s*=\\s*(\\S+)', '\\1') | first }}"
+        debian_mysql_password: "{{ debian_cnf.content | b64decode | regex_search('password\\s*=\\s*(\\S+)', '\\1') | first }}"
+      when: debian_cnf is not skipped and debian_cnf is defined and debian_cnf.content is defined
+
+    - name: Set root password (using Debian maintenance credentials)
+      community.mysql.mysql_user:
+        name: root
+        password: "{{ mysql_root_password }}"
+        login_user: "{{ debian_mysql_user }}"
+        login_password: "{{ debian_mysql_password }}"
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+      when: debian_mysql_user is defined
+
+    - name: Remove anonymous users
+      community.mysql.mysql_user:
+        name: ""
+        host_all: yes
+        state: absent
+        login_user: root
+        login_password: "{{ mysql_root_password }}"
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+
+    - name: Remove the test database and any access privileges
+      community.mysql.mysql_db:
+        db: test
+        state: absent
+        login_user: root
+        login_password: "{{ mysql_root_password }}"
+
+    - name: Ensure privileges are flushed
+      community.mysql.mysql_query:
+        login_user: root
+        login_password: "{{ mysql_root_password }}"
+        query: "FLUSH PRIVILEGES"

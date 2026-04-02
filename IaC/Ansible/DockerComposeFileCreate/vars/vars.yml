@@ -1,0 +1,6 @@
+---
+image: "your-registry.example.com/your-org/your-image:tag"
+ports: 8080:8000
+container_name: "your-app"
+dir_path: "/var/www/{{ container_name }}"
+file_path: "/var/www/{{ container_name }}/docker-compose.yml"

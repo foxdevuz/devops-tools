@@ -1,0 +1,125 @@
+---
+- name: Setup Restricted Shell User for Laravel/Git
+  hosts: all
+  become: true
+  vars:
+    target_user: "edutech"
+    project_path: "/var/www/Labs/edutech.komiljonov.uz"
+    second_project_path: "/var/www/Labs/namangan-tourism.uz"
+
+  tasks:
+    # ── Cleanup: remove rbash if previously set ──────────────────────────────
+    - name: Remove rbash symlink if exists
+      file:
+        path: /bin/rbash
+        state: absent
+
+    - name: Remove rbash from allowed shells if present
+      lineinfile:
+        path: /etc/shells
+        line: /bin/rbash
+        state: absent
+
+    # ── User setup ────────────────────────────────────────────────────────────
+    - name: Create or update user with bash and project home
+      user:
+        name: "{{ target_user }}"
+        shell: /bin/bash
+        home: "{{ project_path }}"
+        create_home: no
+        groups: www-data
+        append: yes
+
+    # ── Directory permissions ─────────────────────────────────────────────────
+    - name: Ensure first project dir permissions
+      file:
+        path: "{{ project_path }}"
+        owner: "{{ target_user }}"
+        group: www-data
+        state: directory
+        recurse: yes
+        mode: '0775'
+
+    - name: Ensure second project dir exists and has correct permissions
+      file:
+        path: "{{ second_project_path }}"
+        owner: "{{ target_user }}"
+        group: www-data
+        state: directory
+        recurse: yes
+        mode: '0775'
+
+    # ── Profile files: touch first, then lock ─────────────────────────────────
+    - name: Ensure profile files exist before locking
+      file:
+        path: "{{ project_path }}/{{ item }}"
+        state: touch
+        modification_time: preserve
+        access_time: preserve
+      loop:
+        - ".bashrc"
+        - ".bash_profile"
+        - ".profile"
+
+    - name: Write restricted shell config into .bashrc
+      blockinfile:
+        path: "{{ project_path }}/.bashrc"
+        marker: "# {mark} ANSIBLE MANAGED RESTRICTED SHELL"
+        block: |
+          # ── Whitelisted directories ──────────────────────────────────────
+          ALLOWED_DIRS=(
+            "{{ project_path }}"
+            "{{ second_project_path }}"
+          )
+
+          # ── Custom cd: only allow whitelisted dirs ───────────────────────
+          function cd() {
+            local target
+
+            # Handle plain `cd` with no args → go home
+            if [[ -z "$1" ]]; then
+              builtin cd "{{ project_path }}"
+              return
+            fi
+
+            # Resolve to absolute path
+            target="$(realpath -m "$1" 2>/dev/null || echo "$1")"
+
+            for dir in "${ALLOWED_DIRS[@]}"; do
+              if [[ "$target" == "$dir" || "$target" == "$dir/"* ]]; then
+                builtin cd "$target"
+                return
+              fi
+            done
+
+            echo "❌ Access denied: '$target'"
+            echo "✅ Allowed directories:"
+            printf '   %s\n' "${ALLOWED_DIRS[@]}"
+          }
+
+          # ── Lock PATH: only safe binaries ────────────────────────────────
+          PATH=$HOME/bin:/usr/bin:/usr/local/bin:/usr/bin/git
+          export PATH
+
+          # ── Auto-navigate to home project on login ───────────────────────
+          cd "{{ project_path }}"
+
+    - name: Write .bash_profile to source .bashrc on login
+      blockinfile:
+        path: "{{ project_path }}/.bash_profile"
+        marker: "# {mark} ANSIBLE MANAGED"
+        block: |
+          # Source .bashrc for login shells
+          [[ -f "$HOME/.bashrc" ]] && source "$HOME/.bashrc"
+
+    # ── Lock profile files so user can't escape ───────────────────────────────
+    - name: Lock profile files (root owns them)
+      file:
+        path: "{{ project_path }}/{{ item }}"
+        owner: root
+        group: root
+        mode: '0644'
+      loop:
+        - ".bashrc"
+        - ".bash_profile"
+        - ".profile"

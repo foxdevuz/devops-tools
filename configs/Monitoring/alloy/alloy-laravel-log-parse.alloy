@@ -1,0 +1,51 @@
+// 1. Discover the log files
+local.file_match "laravel_log_files" {
+  path_targets = [{
+    "__address__" = "localhost",
+    "__path__"    = "/var/www/your-app/storage/logs/laravel.log",
+    "service"     = "your-service",
+  }]
+}
+
+// 2. Scraping the files
+loki.source.file "scrape_laravel" {
+  targets    = local.file_match.laravel_log_files.targets
+  forward_to = [loki.process.parse_laravel.receiver]
+}
+
+// 3. Parsing logic
+loki.process "parse_laravel" {
+  forward_to = [loki.write.grafana_loki.receiver]
+
+  // Combine stack traces that start with [YYYY-MM-DD]
+  stage.multiline {
+    firstline     = "^\\[\\d{4}-\\d{2}-\\d{2}"
+    max_wait_time = "3s"
+  }
+
+  // Extract fields from: [2025-12-25 09:25:08] local.ERROR: Message
+  stage.regex {
+    expression = "^(?P<msg>.*)$"
+  }
+
+  // Create searchable labels for Loki
+  stage.labels {
+    values = {
+      level = "level",
+      env   = "env",
+    }
+  }
+
+  // Use the timestamp from the log file instead of ingestion time
+  stage.timestamp {
+    source = "time"
+    format = "2006-01-02 15:04:05"
+  }
+}
+
+// 4. Send to your Loki instance
+loki.write "grafana_loki" {
+  endpoint {
+    url = "http://localhost:3100/loki/api/v1/push"
+  }
+}

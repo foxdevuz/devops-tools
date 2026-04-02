@@ -1,0 +1,7 @@
+---
+domain: "your-domain.com"
+app_port: app-port
+app_name: "app-name"
+domain_path: "/etc/nginx/sites-available/{{ domain }}"
+enabling_path: "/etc/nginx/sites-enabled/{{ domain }}"
+ssl_email: your-email@example.com

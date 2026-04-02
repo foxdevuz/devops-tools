@@ -1,0 +1,14 @@
+prometheus.exporter.kafka "webhook_kafka" {
+    kafka_uris = ["localhost:9092"]
+}
+
+prometheus.scrape "webhook_kafka_scraper" {
+    targets = prometheus.exporter.kafka.webhook_kafka.targets
+    forward_to = [prometheus.remote_write.webhook_writer.receiver]
+}
+
+prometheus.remote_write "webhook_writer" {
+    endpoint {
+        url = "http://your-prometheus-server:9090/api/prom/push"
+    }
+}

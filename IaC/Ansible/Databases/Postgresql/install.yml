@@ -1,0 +1,79 @@
+---
+- name: Deploy and Configure PostgreSQL on Ubuntu (Based on devops-journey.uz Guide)
+  hosts: production
+  become: true
+  vars_files:
+    - vars/variables.yml
+  tasks:
+    - name: 1. Install prerequisites (curl and ca-certificates)
+      ansible.builtin.apt:
+        pkg:
+          - curl
+          - ca-certificates
+        state: present
+        update_cache: true
+
+    - name: 2. Create directory for PostgreSQL GPG key
+      ansible.builtin.file:
+        path: /usr/share/postgresql-common/pgdg
+        state: directory
+        mode: '0755'
+
+    - name: 3. Download the PostgreSQL signing key
+      ansible.builtin.get_url:
+        url: https://www.postgresql.org/media/keys/ACCC4CF8.asc
+        dest: /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc
+        mode: '0644'
+
+    - name: 4. Add the PostgreSQL APT repository
+      ansible.builtin.apt_repository:
+        repo: "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt {{ ansible_distribution_release }}-pgdg main"
+        state: present
+        filename: pgdg
+        update_cache: true
+
+    - name: 5. Install the latest 'postgresql' package
+      ansible.builtin.apt:
+        name: postgresql
+        state: latest
+
+    # --- Configuration (Dynamic Path Discovery) ---
+
+    - name: 6. Discover the PostgreSQL config directory path (Finds the versioned config file path)
+      ansible.builtin.find:
+        paths: "/etc/postgresql/"
+        patterns: "postgresql.conf"
+        file_type: "file"
+        use_regex: true
+        recurse: true
+      register: pg_conf_files
+
+    - name: Set config file paths as facts
+      ansible.builtin.set_fact:
+        pg_conf_path: "{{ pg_conf_files.files[0].path }}"
+        pg_hba_path: "{{ pg_conf_files.files[0].path | replace('postgresql.conf', 'pg_hba.conf') }}"
+      when: pg_conf_files.files | length > 0
+
+    - name: 7. Configure 'listen_addresses = *' for remote connections in postgresql.conf
+      ansible.builtin.lineinfile:
+        path: "{{ pg_conf_path }}"
+        regexp: "^#?listen_addresses = 'localhost'"
+        line: "listen_addresses = '*'"
+        state: present
+
+    - name: 8. Update pg_hba.conf to allow remote access (0.0.0.0/0 md5)
+      ansible.builtin.blockinfile:
+        path: "{{ pg_hba_path }}"
+        block: |
+          # Added by Ansible for remote access (as per devops-journey.uz guide)
+          host    all             all             0.0.0.0/0               md5
+          host    all             all             ::/0                    md5
+        marker: "# {mark} ANSIBLE MANAGED BLOCK - REMOTE ACCESS"
+
+    - name: 9. Secure the default 'postgres' user with a strong password
+      ansible.builtin.shell: |
+        psql -c "ALTER USER postgres WITH PASSWORD '{{ pg_admin_password }}';"
+      become: true
+      become_user: postgres
+      changed_when: true
+      no_log: true

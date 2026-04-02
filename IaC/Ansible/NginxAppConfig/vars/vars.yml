@@ -1,6 +1,0 @@
----
-domain: "isocom-backend.best-change-grozniy.ru"
-port: 6984
-name: "isocom"
-domain_path: "/etc/nginx/sites-available/{{ domain }}"
-ssl_email: abdullajonovboburjon05@gmail.com

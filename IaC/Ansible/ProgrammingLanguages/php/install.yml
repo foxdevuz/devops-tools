@@ -1,0 +1,36 @@
+---
+- name: Install PHP 8.3 and Laravel Extensions
+  hosts: production
+  become: true
+
+  tasks:
+    - name: Add Ondrej PHP PPA repository
+      ansible.builtin.apt_repository:
+        repo: 'ppa:ondrej/php'
+        update_cache: true
+
+    - name: Install PHP 8.3 and common Laravel extensions
+      ansible.builtin.apt:
+        name:
+          - php8.3
+          - php8.3-cli
+          - php8.3-fpm
+          - php8.3-common
+          - php8.3-mysql
+          - php8.3-zip
+          - php8.3-gd
+          - php8.3-mbstring
+          - php8.3-curl
+          - php8.3-xml
+          - php8.3-bcmath
+          - php8.3-intl
+          - php8.3-sqlite3
+          - php8.3-redis
+          - composer
+        state: present
+
+    - name: Ensure PHP-FPM is running
+      ansible.builtin.systemd:
+        name: php8.3-fpm
+        state: started
+        enabled: true

@@ -1,0 +1,51 @@
+---
+- name: Install Node.js and JavaScript Environment
+  hosts: production
+  become: true
+
+  tasks:
+    - name: Install prerequisites
+      ansible.builtin.apt:
+        pkg:
+          - ca-certificates
+          - curl
+          - gnupg
+        state: present
+        update_cache: true
+
+    - name: Create GPG keyring directory
+      ansible.builtin.file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: '0755'
+
+    - name: Download Nodesource GPG key
+      ansible.builtin.get_url:
+        url: https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key
+        dest: /etc/apt/keyrings/nodesource.asc
+        mode: '0644'
+
+    - name: Add Nodesource repository (Node.js 20.x LTS)
+      ansible.builtin.apt_repository:
+        repo: "deb [signed-by=/etc/apt/keyrings/nodesource.asc] https://deb.nodesource.com/node_20.x nodistro main"
+        state: present
+        filename: nodesource
+        update_cache: true
+
+    - name: Install Node.js
+      ansible.builtin.apt:
+        name: nodejs
+        state: present
+
+    - name: Install global JS tools (PM2 and Yarn)
+      community.general.npm:
+        name: "{{ item }}"
+        global: true
+        state: present
+      loop:
+        - pm2
+        - yarn
+
+    - name: Ensure PM2 is ready to roll
+      ansible.builtin.command: pm2 --version
+      changed_when: false

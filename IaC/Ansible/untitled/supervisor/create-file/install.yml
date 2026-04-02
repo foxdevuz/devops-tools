@@ -1,0 +1,27 @@
+---
+- name: Create Supervisor Configuration Files
+  hosts: production
+  become: true
+
+  tasks:
+    - name: Insert Supervisor configuration file
+      ansible.builtin.copy:
+        dest: /etc/supervisor/conf.d/examzone-horizon.conf
+        content: |
+          [program:examzone-horizon]
+          process_name=%(program_name)s_%(process_num)02d
+          command=php /var/www/startup/examzone/backend/artisan horizon
+          autostart=true
+          autorestart=true
+          stopasgroup=true
+          killasgroup=true
+          user=www-data
+          redirect_stderr=true
+          stdout_logfile=/var/www/startup/examzone/backend/storage/logs/horizon.log
+          stopwaitsecs=3600
+        mode: '0644'
+      notify: Reload Supervisor
+
+  handlers:
+    - name: Reload Supervisor
+      ansible.builtin.command: supervisorctl update

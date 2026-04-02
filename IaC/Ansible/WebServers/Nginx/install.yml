@@ -1,0 +1,35 @@
+---
+- name: Install Nginx and UFW on Production
+  hosts: production
+  become: yes
+
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+
+    - name: Install Nginx
+      apt:
+        name: nginx
+        state: latest
+
+    - name: Firewall - Allow SSH
+      ufw:
+        rule: allow
+        name: OpenSSH
+
+    - name: Firewall - Allow HTTP/HTTPS
+      ufw:
+        rule: allow
+        name: 'Nginx Full'
+
+    - name: Firewall - Enable UFW
+      ufw:
+        state: enabled
+        policy: deny
+
+    - name: Start and Enable Nginx
+      service:
+        name: nginx
+        state: started
+        enabled: yes
